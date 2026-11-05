@@ -1,0 +1,272 @@
+import { Box, Chip, Stack, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, Typography } from '@mui/material';
+import { useState } from 'react';
+import type { Forecast } from '../api/types';
+import { DayRows, RadarStrip, RainBlocks, TempChart } from '../components/charts';
+import { ConfidenceMeter, Empty, KindBadge, Panel, SourceLine, Stat } from '../components/ui';
+import { ago, dir8, hm, hour, num, pct } from '../lib/format';
+import { load, save } from '../lib/storage';
+import { brand, confColor } from '../theme';
+
+export function ForecastPage({ data }: { data: Forecast }) {
+  const [tab, setTab] = useState<number>(() => load('atmos:fcTab', 0));
+  const change = (_: unknown, v: number) => {
+    setTab(v);
+    save('atmos:fcTab', v);
+  };
+  return (
+    <Stack spacing={2}>
+      <Tabs value={tab} onChange={change} variant="fullWidth" sx={{ bgcolor: 'background.paper', borderRadius: '6px', border: 1, borderColor: 'divider' }}>
+        <Tab label="Curto · 0–2 h" />
+        <Tab label="Médio · 2–48 h" />
+        <Tab label="Longo · 3–16 d" />
+      </Tabs>
+      {tab === 0 && <Short data={data} />}
+      {tab === 1 && <Medium data={data} />}
+      {tab === 2 && <Long data={data} />}
+    </Stack>
+  );
+}
+
+function Short({ data }: { data: Forecast }) {
+  const tz = data.location.timezone;
+  const nc = data.shortTerm;
+  const now = Date.now() / 1000;
+  if (!nc.available) {
+    const next = data.mediumTerm.blocks.filter((b) => b.end > now).slice(0, 1);
+    return (
+      <Panel title="Nowcasting por radar" accent={brand.red}>
+        <Typography sx={{ mb: 1 }}>
+          <strong>Previsão imediata indisponível.</strong> {nc.reason}
+        </Typography>
+        <Typography color="text.secondary" sx={{ mb: 2 }}>
+          Sem radar adequado, o ATMOS não calcula horário de chegada de chuva. Os modelos numéricos não têm resolução para isso;
+          abaixo, apenas a probabilidade do ensemble para o próximo bloco de 3 h.
+        </Typography>
+        {next.map((b) => (
+          <Stat key={b.start} label={`Chance de chuva ${hm(b.start, tz)}–${hm(b.end, tz)}`} value={pct(b.rainProbability)} hint="ensemble · baixa confiança para horário exato" />
+        ))}
+      </Panel>
+    );
+  }
+  const a = nc.arrival;
+  return (
+    <Stack spacing={2}>
+      <Panel title="Chuva nas próximas 2 horas" accent={brand.blue} right={<ConfidenceMeter level={nc.confidence} />}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr)' }, gap: 1, mb: 2 }}>
+          <Stat label="Agora no ponto" value={nc.current?.class ? `Chuva ${nc.current.class}` : 'Sem chuva'} hint={nc.current?.dbz != null ? `${num(nc.current.dbz)} dBZ · ~${num(nc.current.rateMmH, 1)} mm/h` : 'radar'} />
+          <Stat
+            label="Chegada estimada"
+            value={a ? (a.latestMinutes && a.latestMinutes > a.earliestMinutes ? `${a.earliestMinutes}–${a.latestMinutes}` : `~${a.centralMinutes}`) : '—'}
+            unit={a ? 'min' : undefined}
+            hint={a ? `pelo ${a.from} · central ${a.centralMinutes} min` : nc.current?.class ? 'já chovendo' : 'nenhuma chuva em rota'}
+          />
+          <Stat
+            label="Duração"
+            value={a ? `${a.durationTruncated ? '≥' : ''}${a.durationMinutes}` : '—'}
+            unit={a ? 'min' : undefined}
+            hint={a ? `intensidade máx.: ${a.maxClass ?? '—'}` : 'incerta'}
+          />
+          <Stat
+            label="Deslocamento"
+            value={nc.motion ? num(nc.motion.speedKmh) : '—'}
+            unit={nc.motion ? 'km/h' : undefined}
+            hint={nc.motion ? `para ${nc.motion.toward}${nc.motion.spreadKmh !== null ? ` · ±${nc.motion.spreadKmh} km/h` : ''}` : 'não estimado'}
+          />
+        </Box>
+        <RadarStrip nc={nc} tz={tz} />
+        {nc.nearestEcho && (
+          <Typography variant="body2" sx={{ mt: 1.5 }}>
+            Eco de chuva mais próximo: {num(nc.nearestEcho.distanceKm, 0)} km a {nc.nearestEcho.direction}.
+          </Typography>
+        )}
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          <strong>Confiança:</strong> {(nc.confidenceReasons ?? []).join('; ')}.
+        </Typography>
+        <SourceLine>
+          {nc.method}. Quadro de {hm(nc.latestFrameTime, tz)} ({ago(nc.latestFrameTime)}), domínio de ~{nc.domainRadiusKm} km de raio, {nc.motion?.pairs ?? 0} pares de quadros válidos.
+        </SourceLine>
+      </Panel>
+      <Panel title="Limitações do nowcasting" accent={brand.yellow}>
+        <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
+          {(nc.limitations ?? []).map((l) => (
+            <li key={l}>
+              <Typography variant="body2">{l}</Typography>
+            </li>
+          ))}
+          <li>
+            <Typography variant="body2">Descargas elétricas: sem fonte licenciada integrada.</Typography>
+          </li>
+        </Box>
+      </Panel>
+    </Stack>
+  );
+}
+
+function Medium({ data }: { data: Forecast }) {
+  const tz = data.location.timezone;
+  const now = Date.now() / 1000;
+  const mt = data.mediumTerm;
+  const hours = mt.hours.filter((h) => h.time >= now - 1800);
+  const blockOf = (t: number) => mt.blocks.find((b) => b.start < t && t <= b.end);
+  const modelErr = data.sources.find((s) => s.id === 'models' && s.status === 'error');
+  return (
+    <Stack spacing={2}>
+      {modelErr && (
+        <Panel title="Modelos determinísticos indisponíveis" accent={brand.red}>
+          <Typography>
+            {modelErr.message}. Temperatura, vento e consenso entre modelos não puderam ser calculados agora; as probabilidades de chuva abaixo vêm dos
+            ensembles, quando disponíveis. Tente atualizar em alguns minutos.
+          </Typography>
+        </Panel>
+      )}
+      {mt.riskWindows.length > 0 && (
+        <Panel title="Horários de maior risco" accent={brand.red}>
+          <Stack spacing={1}>
+            {mt.riskWindows.slice(0, 6).map((r) => (
+              <Box key={r.start} sx={{ display: 'flex', gap: 1.5, alignItems: 'baseline' }}>
+                <Typography sx={{ fontWeight: 700, minWidth: 96 }}>
+                  {hm(r.start, tz)}–{hm(r.end, tz)}
+                </Typography>
+                <Box>
+                  <Typography sx={{ textTransform: 'capitalize', fontWeight: 600 }}>{r.kind}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {r.reasons.join('; ')}
+                  </Typography>
+                </Box>
+              </Box>
+            ))}
+          </Stack>
+        </Panel>
+      )}
+      <Panel title="Temperatura · 48 h" accent={brand.yellow} right={<KindBadge kind="consensus" />}>
+        <TempChart hours={mt.hours} tz={tz} now={now} />
+      </Panel>
+      <Panel title="Chuva · blocos de 3 h" accent={brand.blue} right={<KindBadge kind="ensemble" />}>
+        <RainBlocks blocks={mt.blocks} tz={tz} now={now} />
+      </Panel>
+      <Panel title="Confiança por período" accent={brand.green}>
+        <Box sx={{ display: 'flex', gap: '2px' }}>
+          {mt.confidence.slice(0, 16).map((c) => (
+            <Box key={c.start} title={`${hm(c.start, tz)}–${hm(c.end, tz)}: ${c.reasons.join('; ')}`} sx={{ flex: 1, textAlign: 'center' }}>
+              <Box sx={{ height: 10, bgcolor: confColor[c.confidence], borderRadius: '2px' }} />
+              <Typography sx={{ fontSize: '0.62rem' }} color="text.secondary">
+                {hour(c.start, tz)}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+        <SourceLine>Verde alta · amarelo moderada · vermelho baixa. Considera prazo, dispersão entre modelos e divergência entre ensembles.</SourceLine>
+      </Panel>
+      {hours.length > 0 && <Panel title="Previsão horária" dense>
+        <TableContainer sx={{ maxHeight: 460 }}>
+          <Table size="small" stickyHeader>
+            <TableHead>
+              <TableRow>
+                {['Hora', 'Temp.', 'Faixa', 'Chuva*', 'Vento', 'Rajada', 'Nuvens', 'Visib.', 'Pressão'].map((h) => (
+                  <TableCell key={h} sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
+                    {h}
+                  </TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {hours.map((h) => {
+                const b = blockOf(h.time);
+                return (
+                  <TableRow key={h.time}>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{hm(h.time, tz)}</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>{num(h.temperature?.value, 0)}°</TableCell>
+                    <TableCell sx={{ color: 'text.secondary', whiteSpace: 'nowrap' }}>
+                      {num(h.temperature?.min, 0)}–{num(h.temperature?.max, 0)}
+                    </TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{pct(b?.rainProbability)}</TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                      {num(h.windSpeed?.value, 0)} {dir8(h.windDirection)}
+                    </TableCell>
+                    <TableCell>{num(h.windGust?.value, 0)}</TableCell>
+                    <TableCell>{num(h.cloudCover?.value, 0)}%</TableCell>
+                    <TableCell>{h.visibility?.value != null ? `${num(h.visibility.value, 0)} km` : '—'}</TableCell>
+                    <TableCell>{num(h.pressure?.value, 0)}</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        <Box sx={{ p: 1.5 }}>
+          <Typography variant="caption" color="text.secondary">
+            Temperatura, vento (km/h), nuvens, visibilidade e pressão (hPa): mediana ponderada entre modelos. *Chance de chuva do bloco de 3 h do ensemble.
+            Visibilidade só existe em parte dos modelos.
+          </Typography>
+        </Box>
+      </Panel>}
+      <Box>
+        {mt.notes.map((n) => (
+          <Chip key={n} label={n} size="small" variant="outlined" sx={{ mr: 1, mb: 1, height: 'auto', '& .MuiChip-label': { whiteSpace: 'normal', py: 0.5 } }} />
+        ))}
+      </Box>
+    </Stack>
+  );
+}
+
+function Long({ data }: { data: Forecast }) {
+  const tz = data.location.timezone;
+  const days = data.longTerm.days.filter((d) => d.leadDays >= 2);
+  return (
+    <Stack spacing={2}>
+      <Panel title="Tendência · até 16 dias" accent={brand.yellow} right={<KindBadge kind="ensemble" />}>
+        {days.length ? <DayRows days={days} tz={tz} /> : <Empty>Ensembles de longo prazo indisponíveis no momento.</Empty>}
+      </Panel>
+      {days.length > 0 && (
+        <Panel title="Divergência entre sistemas de ensemble" dense>
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Dia</TableCell>
+                  {Object.values(days[0].systems).map((s) => (
+                    <TableCell key={s.name} sx={{ whiteSpace: 'nowrap' }}>
+                      {s.name}
+                    </TableCell>
+                  ))}
+                  <TableCell>Δ chance</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {days.map((d) => (
+                  <TableRow key={d.date}>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>+{d.leadDays} d</TableCell>
+                    {Object.keys(days[0].systems).map((k) => {
+                      const s = d.systems[k];
+                      return (
+                        <TableCell key={k} sx={{ whiteSpace: 'nowrap' }}>
+                          {s ? `${num(s.tmaxMedian, 0)}° · ${pct(s.pRain)}` : '—'}
+                        </TableCell>
+                      );
+                    })}
+                    <TableCell>{d.divergence.rainProbability !== null ? `${Math.round(d.divergence.rainProbability * 100)} p.p.` : '—'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <Box sx={{ p: 1.5 }}>
+            <Typography variant="caption" color="text.secondary">
+              Máxima mediana e chance de ≥1 mm em cada sistema. "—" = sistema sem dados nesse prazo (ICON-EPS vai até ~7 dias).
+            </Typography>
+          </Box>
+        </Panel>
+      )}
+      <Panel title="Além de 16 dias" accent="#8A8A99">
+        <Typography color="text.secondary">{data.longTerm.beyond16Days.reason}</Typography>
+      </Panel>
+      <Box>
+        {data.longTerm.notes.map((n) => (
+          <Typography key={n} variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+            {n}
+          </Typography>
+        ))}
+      </Box>
+    </Stack>
+  );
+}

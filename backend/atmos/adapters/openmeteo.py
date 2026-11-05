@@ -128,7 +128,8 @@ def has_data(series: list | None) -> bool:
     return bool(series) and any(v is not None for v in series)
 
 
-async def fetch_multimodel(lat: float, lon: float, forecast_days: int = 16) -> dict[str, Any]:
+async def fetch_multimodel(lat: float, lon: float, forecast_days: int = 3) -> dict[str, Any]:
+    """Determinísticos só até 72 h (médio prazo): o longo prazo vem dos ensembles. Reduz a cota usada."""
     models = [m.id for m in DETERMINISTIC_MODELS]
     params = _base_params(lat, lon) | {
         "hourly": ",".join(HOURLY_VARS),

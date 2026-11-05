@@ -65,6 +65,11 @@ def build_verdict(
             if motion:
                 parts.append(f"As células se deslocam para {motion['toward']} a cerca de {motion['speedKmh']} km/h.")
             fc = nowcast.get("forecast") or []
+            order = ["fraca", "moderada", "forte", "muito forte"]
+            next_hour = [s["class"] for s in fc if s["lead"] <= 60 and s["class"]]
+            worst = max(next_hour, key=order.index) if next_hour else None
+            if worst and order.index(worst) > order.index(cur["class"]):
+                parts.append(f"A extrapolação do radar indica possível intensificação para chuva {worst} na próxima hora.")
             dry = [s for s in fc if not s["class"] and s["inDomain"]]
             if fc and len(dry) >= 2 and fc[0]["class"]:
                 first_dry = next(s["lead"] for s in fc if not s["class"])

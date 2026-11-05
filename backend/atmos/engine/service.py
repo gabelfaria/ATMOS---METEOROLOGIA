@@ -97,6 +97,8 @@ def build(lat: float, lon: float, raw: dict[str, Any], now: float | None = None,
         agreement = consensus.model_agreement(mm, [h for h in hours if h["time"] >= now], blocks, weights)
     else:
         sources.append(_source("models", "Modelos numéricos (Open-Meteo)", "model", "error", getattr(mm, "message", None)))
+        if ok(ens_h):  # sem determinísticos, ainda há probabilidades reais dos ensembles
+            blocks = consensus.precip_blocks({"times": [], "models": {}}, ens_h, {}, int(now) - 3 * 3600, int(now) + 48 * 3600)
 
     if ok(ens_h):
         names = ", ".join(openmeteo.ENSEMBLE_BY_ID[e].name for e in ens_h["ensembles"] if e in openmeteo.ENSEMBLE_BY_ID)
