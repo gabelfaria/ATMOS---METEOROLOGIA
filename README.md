@@ -12,6 +12,22 @@ backend/   Python + FastAPI · Weather Intelligence Engine · nowcasting de rada
 docs/      FONTES.md (fontes, acesso, riscos) · ARQUITETURA.md (motor, regras, limitações)
 ```
 
+## App Android (APK)
+
+O APK roda o motor meteorológico **no próprio celular**, consultando as fontes diretamente — não precisa de
+servidor. Para instalar: copie o `.apk` para o celular, toque nele e permita "instalar apps desta fonte".
+
+Para gerar um novo APK (Android SDK + Java 21):
+
+```bash
+cd web && npm install && npm run build
+npx cap sync android
+cd android && ./gradlew assembleDebug     # app/build/outputs/apk/debug/app-debug.apk
+```
+
+O motor do aparelho (`web/src/engine/`) é a mesma lógica do backend Python, com testes próprios
+(`npm test`). A versão web continua podendo usar o backend FastAPI.
+
 ## Executar localmente
 
 Requisitos: Python ≥ 3.11 e Node ≥ 20.

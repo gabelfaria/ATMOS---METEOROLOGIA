@@ -1,4 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { Geolocation } from '@capacitor/geolocation';
 import { reverse } from '../api/client';
 import type { Place } from '../api/types';
 import { load, save } from './storage';
@@ -28,6 +30,35 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const requestGps = useCallback(() => {
+    if (Capacitor.isNativePlatform()) {
+      setLocating(true);
+      setGeoError(null);
+      (async () => {
+        try {
+          const perm = await Geolocation.requestPermissions({ permissions: ['coarseLocation', 'location'] });
+          if (perm.location !== 'granted' && perm.coarseLocation !== 'granted') throw Object.assign(new Error('denied'), { denied: true });
+          const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: false, timeout: 20000, maximumAge: 300000 });
+          const { latitude, longitude, accuracy } = pos.coords;
+          let label = `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`;
+          try {
+            const r = await reverse(latitude, longitude);
+            if (r.label) label = r.label;
+          } catch {
+            /* rótulo por coordenadas */
+          }
+          setPlace({ lat: latitude, lon: longitude, label, source: 'gps', accuracy });
+        } catch (e) {
+          setGeoError(
+            (e as { denied?: boolean }).denied
+              ? 'Permissão de localização negada. Você pode buscar o local manualmente.'
+              : 'Não foi possível obter a localização. Verifique se o GPS está ligado ou busque o local.',
+          );
+        } finally {
+          setLocating(false);
+        }
+      })();
+      return;
+    }
     if (!('geolocation' in navigator)) {
       setGeoError('Este navegador não oferece geolocalização. Busque o local manualmente.');
       return;

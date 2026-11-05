@@ -9,7 +9,11 @@ import type {
   SatelliteLayer,
 } from './types';
 
+import { Capacitor } from '@capacitor/core';
+
 const BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? '';
+/** No APK (ou com VITE_STANDALONE=1) o motor roda no próprio aparelho, sem servidor. */
+export const STANDALONE = Capacitor.isNativePlatform() || import.meta.env.VITE_STANDALONE === '1';
 
 export class ApiError extends Error {
   status: number;
@@ -20,6 +24,14 @@ export class ApiError extends Error {
 }
 
 async function get<T>(path: string, params?: Record<string, string | number>): Promise<T> {
+  if (STANDALONE) {
+    const { localApi } = await import('../engine/service');
+    try {
+      return (await localApi(path, Object.fromEntries(Object.entries(params ?? {}).map(([k, v]) => [k, String(v)])))) as T;
+    } catch (e) {
+      throw new ApiError(502, (e as Error).message);
+    }
+  }
   const qs = params ? '?' + new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])) : '';
   let res: Response;
   try {
@@ -115,6 +127,7 @@ export const geocode = (q: string) => get<{ results: GeoResult[]; errors?: strin
 export const reverse = (lat: number, lon: number) =>
   get<{ label: string | null }>('/api/reverse', { lat: coarse(lat), lon: coarse(lon) });
 export const deleteServerData = async (lat: number, lon: number) => {
+  if (STANDALONE) return get<{ deletedRows: number }>('/api/privacy', { lat, lon });
   const res = await fetch(`${BASE}/api/privacy?lat=${coarse(lat)}&lon=${coarse(lon)}`, { method: 'DELETE' });
   if (!res.ok) throw new ApiError(res.status, 'Falha ao apagar');
   return res.json() as Promise<{ deletedRows: number }>;

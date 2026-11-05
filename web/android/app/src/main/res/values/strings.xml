@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ATMOS</string>
+    <string name="title_activity_main">ATMOS</string>
+    <string name="package_name">br.atmos.meteorologia</string>
+    <string name="custom_url_scheme">br.atmos.meteorologia</string>
+</resources>
