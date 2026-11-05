@@ -160,8 +160,8 @@ export async function fetchGrid(lat0: number, lon0: number) {
   const clon = Math.round(lon0 * 2) / 2;
   const lats: number[] = [];
   const lons: number[] = [];
-  for (let i = -3; i <= 3; i++)
-    for (let j = -3; j <= 3; j++) {
+  for (let i = -4; i <= 4; i++)
+    for (let j = -4; j <= 4; j++) {
       lats.push(Math.round((clat + i * 0.25) * 1000) / 1000);
       lons.push(Math.round((clon + j * 0.25) * 1000) / 1000);
     }

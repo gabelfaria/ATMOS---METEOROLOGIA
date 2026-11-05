@@ -35,7 +35,8 @@ function key(url: string, params?: Record<string, string | number>) {
 }
 
 async function rawGet(source: string, url: string, kind: 'json' | 'text' | 'blob', native: boolean): Promise<unknown> {
-  if (native && isNative()) {
+  // No Android, todo JSON/texto vai pelo HTTP nativo: status real (ex.: 429) e sem depender de CORS.
+  if ((native || kind !== 'blob') && isNative()) {
     const res = await CapacitorHttp.get({
       url,
       headers: { 'User-Agent': 'ATMOS-Weather/0.2 (Android; github.com/gabelfaria/ATMOS---METEOROLOGIA)', Accept: 'application/json' },
@@ -53,7 +54,10 @@ async function rawGet(source: string, url: string, kind: 'json' | 'text' | 'blob
   try {
     res = await fetch(url, { signal: ctrl.signal });
   } catch (e) {
-    throw new SourceError(source, `indisponível (${(e as Error).name})`);
+    throw new SourceError(
+      source,
+      (e as Error).name === 'AbortError' ? 'sem resposta em 20 s' : 'sem resposta (sem internet ou a fonte recusou — possível limite de uso)',
+    );
   } finally {
     clearTimeout(t);
   }
@@ -90,7 +94,15 @@ export async function get<T>(
   if (running) return running as Promise<Fetched<T>>;
   const p = (async () => {
     try {
-      const value = await rawGet(source, k, kind, native);
+      let value: unknown;
+      try {
+        value = await rawGet(source, k, kind, native);
+      } catch (first) {
+        await new Promise((r) => setTimeout(r, 1500));
+        value = await rawGet(source, k, kind, native).catch(() => {
+          throw first;
+        });
+      }
       const at = Date.now() / 1000;
       if (mem.size > 800) mem.delete(mem.keys().next().value!);
       mem.set(k, { value, at, ttl });
@@ -108,4 +120,10 @@ export async function get<T>(
 
 export function clearCache() {
   mem.clear();
+}
+
+/** Ao puxar para atualizar: descarta dados de curta duração (radar, estações, alertas, condição atual),
+ *  mantendo as rodadas de modelo (que só mudam a cada poucas horas) para poupar a cota das APIs. */
+export function expireShortLived() {
+  for (const [k, e] of mem) if (e.ttl <= 900) mem.delete(k);
 }

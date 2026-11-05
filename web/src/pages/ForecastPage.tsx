@@ -16,9 +16,19 @@ export function ForecastPage({ data }: { data: Forecast }) {
   return (
     <Stack spacing={2}>
       <Tabs value={tab} onChange={change} variant="fullWidth" sx={{ bgcolor: 'background.paper', borderRadius: '6px', border: 1, borderColor: 'divider' }}>
-        <Tab label="Curto · 0–2 h" />
-        <Tab label="Médio · 2–48 h" />
-        <Tab label="Longo · 3–16 d" />
+        {[['CURTO', '0–2 h'], ['MÉDIO', '2–48 h'], ['LONGO', '3–16 dias']].map(([a, b]) => (
+          <Tab
+            key={a}
+            label={
+              <Box sx={{ lineHeight: 1.1 }}>
+                {a}
+                <Box component="span" sx={{ display: 'block', fontSize: '0.7rem', fontFamily: 'Inter, sans-serif', fontWeight: 600, letterSpacing: 0, textTransform: 'none', opacity: 0.8 }}>
+                  {b}
+                </Box>
+              </Box>
+            }
+          />
+        ))}
       </Tabs>
       {tab === 0 && <Short data={data} />}
       {tab === 1 && <Medium data={data} />}
@@ -49,6 +59,16 @@ function Short({ data }: { data: Forecast }) {
     );
   }
   const a = nc.arrival;
+  // Chovendo agora: quanto tempo a extrapolação mantém chuva sobre o ponto
+  const fcs = nc.forecast ?? [];
+  const firstDry = fcs.find((s) => !s.class);
+  const remaining = !nc.current?.class
+    ? { value: '—', hint: 'sem chuva prevista no ponto' }
+    : !fcs.length
+      ? { value: '—', hint: 'movimento não estimado' }
+      : firstDry
+        ? { value: `~${firstDry.lead}`, hint: 'até a extrapolação ficar seca' }
+        : { value: '≥120', hint: 'chuva em toda a extrapolação' };
   return (
     <Stack spacing={2}>
       <Panel title="Chuva nas próximas 2 horas" accent={brand.blue} right={<ConfidenceMeter level={nc.confidence} />}>
@@ -61,10 +81,10 @@ function Short({ data }: { data: Forecast }) {
             hint={a ? `pelo ${a.from} · central ${a.centralMinutes} min` : nc.current?.class ? 'já chovendo' : 'nenhuma chuva em rota'}
           />
           <Stat
-            label="Duração"
-            value={a ? `${a.durationTruncated ? '≥' : ''}${a.durationMinutes}` : '—'}
-            unit={a ? 'min' : undefined}
-            hint={a ? `intensidade máx.: ${a.maxClass ?? '—'}` : 'incerta'}
+            label={nc.current?.class ? 'Deve continuar' : 'Duração'}
+            value={a ? `${a.durationTruncated ? '≥' : ''}${a.durationMinutes}` : remaining.value}
+            unit={a || remaining.value !== '—' ? 'min' : undefined}
+            hint={a ? `intensidade máx.: ${a.maxClass ?? '—'}` : remaining.hint}
           />
           <Stat
             label="Deslocamento"
@@ -109,13 +129,27 @@ function Medium({ data }: { data: Forecast }) {
   const hours = mt.hours.filter((h) => h.time >= now - 1800);
   const blockOf = (t: number) => mt.blocks.find((b) => b.start < t && t <= b.end);
   const modelErr = data.sources.find((s) => s.id === 'models' && s.status === 'error');
+  const nc = data.shortTerm;
+  const radarWet = nc.available && (!!nc.current?.class || (nc.forecast ?? []).some((s) => s.lead <= 120 && s.class));
+  const first = mt.blocks.find((b) => b.end > now);
+  const conflict = radarWet && first && first.rainProbability !== null && first.rainProbability < 0.25;
   return (
     <Stack spacing={2}>
+      {conflict && (
+        <Panel title="Radar e modelos discordam agora" accent={brand.yellow}>
+          <Typography>
+            O radar {nc.current?.class ? `mostra chuva ${nc.current.class} no seu local agora` : 'mostra chuva chegando nas próximas 2 h'}, mas os modelos davam só{' '}
+            {pct(first!.rainProbability)} de chance para {hm(first!.start, tz)}–{hm(first!.end, tz)}. Para as próximas 2 horas, vale o radar (aba Curto):
+            ele mede a chuva real, enquanto os modelos, com grade de 10–25 km, muitas vezes erram pancadas localizadas. Daqui para frente, use os modelos
+            como tendência.
+          </Typography>
+        </Panel>
+      )}
       {modelErr && (
         <Panel title="Modelos determinísticos indisponíveis" accent={brand.red}>
           <Typography>
-            {modelErr.message}. Temperatura, vento e consenso entre modelos não puderam ser calculados agora; as probabilidades de chuva abaixo vêm dos
-            ensembles, quando disponíveis. Tente atualizar em alguns minutos.
+            A fonte dos modelos (Open-Meteo) não respondeu: {modelErr.message}. Temperatura, vento e consenso entre modelos ficam indisponíveis até ela
+            voltar; as chances de chuva abaixo vêm dos ensembles, quando disponíveis. Puxe a tela para baixo para tentar de novo em alguns minutos.
           </Typography>
         </Panel>
       )}
@@ -142,7 +176,7 @@ function Medium({ data }: { data: Forecast }) {
         <TempChart hours={mt.hours} tz={tz} now={now} />
       </Panel>
       <Panel title="Chuva · blocos de 3 h" accent={brand.blue} right={<KindBadge kind="ensemble" />}>
-        <RainBlocks blocks={mt.blocks} tz={tz} now={now} />
+        <RainBlocks blocks={mt.blocks} tz={tz} now={now} nowcast={data.shortTerm} />
       </Panel>
       <Panel title="Confiança por período" accent={brand.green}>
         <Box sx={{ display: 'flex', gap: '2px' }}>

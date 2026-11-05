@@ -105,11 +105,18 @@ export async function forecast(lat: number, lon: number): Promise<Forecast> {
   };
   const estimated = estimatedAlerts({ now, tz: off, nc, obs, blocks, previous: previousSummary(lat, lon, now - 1800), summary: s24 });
 
-  const mediumConf = blocks.filter((b) => b.start >= now).map((b) => {
+  const mediumConf = blocks.filter((b) => b.end > now).map((b) => {
     const sp = hours.filter((h) => b.start < h.time && h.time <= b.end).map((h) => h.temperature?.spread).filter((v): v is number => v !== null && v !== undefined);
     const [confidence, reasons] = C.mediumConfidence((b.start - now) / 3600 + 1.5, sp.length ? Math.max(...sp) : null, b.modelAgreementWet, b.probabilitySpread);
     return { start: b.start, end: b.end, confidence, reasons };
   });
+  // Radar vê chuva que os modelos não previam → a confiança do bloco atual não pode ser alta
+  const radarWet = nc.available && (!!nc.current?.class || (nc.forecast ?? []).some((x) => x.class));
+  const cur0 = mediumConf[0] && blocks.find((b) => b.start === mediumConf[0].start);
+  if (radarWet && cur0 && cur0.rainProbability !== null && cur0.rainProbability < 0.25) {
+    mediumConf[0].confidence = 'low';
+    mediumConf[0].reasons.push('Radar observa chuva que os modelos não previam neste período');
+  }
   const days = !isErr(ensD) && ensD.times.length ? C.dailyEnsemble(ensD, ensD.times[0]) : [];
 
   if (hours.length) {

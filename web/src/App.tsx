@@ -1,7 +1,8 @@
 import { AppBar, BottomNavigation, BottomNavigationAction, Box, Button, Container, IconButton, Stack, Toolbar, Tooltip, Typography, useMediaQuery } from '@mui/material';
 import { useColorScheme } from '@mui/material/styles';
-import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
-import { useForecast } from './api/client';
+import { lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from 'react';
+import { STANDALONE, useForecast } from './api/client';
+import { usePullToRefresh } from './lib/usePullToRefresh';
 import { LocationSearch } from './components/LocationSearch';
 import { ErrorState, Loading } from './components/ui';
 import { ago } from './lib/format';
@@ -41,6 +42,22 @@ export default function App() {
   const wide = useMediaQuery('(min-width:900px)');
   const { mode, setMode } = useColorScheme();
   const fc = useForecast(place?.lat, place?.lon);
+  const refetch = fc.refetch;
+
+  const refresh = useCallback(async () => {
+    if (STANDALONE) (await import('./engine/net')).expireShortLived();
+    await refetch();
+  }, [refetch]);
+  const { pull, refreshing } = usePullToRefresh(refresh, !!place && tab !== 'map');
+
+  // Ao voltar para o app depois de um tempo, atualiza sozinho
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === 'visible' && fc.data && Date.now() / 1000 - fc.data.generatedAt > 5 * 60) refresh();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, [fc.data, refresh]);
 
   const go = (t: TabId) => {
     setTab(t);
@@ -98,7 +115,7 @@ export default function App() {
 
   return (
     <Box sx={{ minHeight: '100dvh', bgcolor: 'background.default', pb: wide ? 2 : 'calc(64px + env(safe-area-inset-bottom))' }}>
-      <AppBar position="sticky" elevation={0} sx={{ bgcolor: brand.purple, color: '#fff', borderBottom: `3px solid ${brand.green}` }}>
+      <AppBar position="sticky" elevation={0} sx={{ bgcolor: brand.purple, color: '#fff', borderBottom: `3px solid ${brand.green}`, pt: 'env(safe-area-inset-top)' }}>
         <Toolbar sx={{ gap: 1.5, minHeight: { xs: 56 } }}>
           <Typography sx={{ fontFamily: condensed, fontWeight: 800, fontSize: 24, letterSpacing: '0.08em' }}>
             ATM<Box component="span" sx={{ color: brand.green }}>O</Box>S
@@ -115,7 +132,7 @@ export default function App() {
           </Box>
           {place && (
             <Tooltip title="Atualizar">
-              <IconButton aria-label="Atualizar" onClick={() => fc.refetch()} sx={{ color: '#fff' }} disabled={fc.isFetching}>
+              <IconButton aria-label="Atualizar" onClick={() => refresh()} sx={{ color: '#fff' }} disabled={fc.isFetching}>
                 ⟳
               </IconButton>
             </Tooltip>
@@ -135,6 +152,13 @@ export default function App() {
       <Box sx={{ display: 'flex' }}>
         {wide && <Box sx={{ position: 'sticky', top: 64, alignSelf: 'flex-start' }}>{nav}</Box>}
         <Container maxWidth={tab === 'map' ? 'xl' : 'md'} sx={{ py: 2, px: { xs: 1.5, sm: 2 } }}>
+          {(pull > 0 || refreshing) && (
+            <Box sx={{ height: refreshing ? 40 : pull * 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+              <Typography sx={{ fontFamily: condensed, fontWeight: 700, letterSpacing: '0.1em', fontSize: '0.8rem', color: pull >= 70 || refreshing ? 'primary.main' : 'text.secondary' }}>
+                {refreshing ? 'ATUALIZANDO…' : pull >= 70 ? 'SOLTE PARA ATUALIZAR' : 'PUXE PARA ATUALIZAR'}
+              </Typography>
+            </Box>
+          )}
           {body}
         </Container>
       </Box>

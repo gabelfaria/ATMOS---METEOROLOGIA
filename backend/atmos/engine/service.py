@@ -209,7 +209,7 @@ def build(lat: float, lon: float, raw: dict[str, Any], now: float | None = None,
     # --- Médio prazo: confiança por bloco de 6 h
     medium_conf = []
     for b in blocks:
-        if b["start"] < now:
+        if b["end"] <= now:
             continue
         hs = [h for h in hours if b["start"] < h["time"] <= b["end"]]
         spreads = [h["temperature"]["spread"] for h in hs if h.get("temperature") and h["temperature"]["spread"] is not None]

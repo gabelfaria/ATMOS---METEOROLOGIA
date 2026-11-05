@@ -11,29 +11,14 @@ const CLASS_COLOR: Record<string, string> = {
   'muito forte': '#8A2BE2',
 };
 
-function Tooltip({ at, children }: { at: number; children: React.ReactNode }) {
-  // `at` = posição horizontal em % da largura do gráfico
-  const left = `clamp(0px, calc(${at}% - 80px), calc(100% - 160px))`;
+/** Leitura fixa ACIMA do gráfico: ao tocar, o valor aparece fora da área coberta pelo dedo. */
+function Readout({ children }: { children?: React.ReactNode }) {
   return (
     <Box
-      role="tooltip"
-      sx={{
-        position: 'absolute',
-        top: 0,
-        left,
-        width: 160,
-        p: 1,
-        bgcolor: 'background.paper',
-        border: 1,
-        borderColor: 'divider',
-        borderRadius: '4px',
-        boxShadow: 3,
-        fontSize: '0.78rem',
-        pointerEvents: 'none',
-        zIndex: 2,
-      }}
+      aria-live="polite"
+      sx={{ minHeight: 44, mb: 1, px: 1.25, py: 0.75, bgcolor: 'action.hover', borderRadius: '4px', fontSize: '0.8rem', lineHeight: 1.35, color: children ? 'text.primary' : 'text.secondary' }}
     >
-      {children}
+      {children ?? 'Toque ou arraste no gráfico para ver os valores.'}
     </Box>
   );
 }
@@ -47,16 +32,22 @@ export function RadarStrip({ nc, tz }: { nc: Nowcast; tz: string }) {
   if (!all.length) return null;
   const sel = hover !== null ? all[hover] : null;
   return (
-    <Box sx={{ position: 'relative', pt: 6 }}>
-      {sel && (
-        <Tooltip at={((hover! + 0.5) / all.length) * 100}>
-          <strong>{hm(sel.time ?? 0, tz)}</strong> · {sel.f ? 'extrapolação' : 'observado'}
-          <br />
-          {sel.class ? `Chuva ${sel.class} (~${num(sel.rateMmH, 1)} mm/h)` : 'Sem chuva no ponto'}
-          {sel.dbz !== null && sel.dbz !== undefined ? ` · ${num(sel.dbz)} dBZ` : ''}
-        </Tooltip>
-      )}
-      <Box sx={{ display: 'flex', gap: '2px', alignItems: 'flex-end', height: 56 }} onPointerLeave={() => setHover(null)}>
+    <Box sx={{ position: 'relative' }}>
+      <Readout>
+        {sel && (
+          <>
+            <strong>{hm(sel.time ?? 0, tz)}</strong> · {sel.f ? 'extrapolação' : 'observado'}
+            <br />
+            {sel.class ? `Chuva ${sel.class} (~${num(sel.rateMmH, 1)} mm/h)` : 'Sem chuva no ponto'}
+            {sel.dbz !== null && sel.dbz !== undefined ? ` · ${num(sel.dbz)} dBZ` : ''}
+          </>
+        )}
+      </Readout>
+      <Box sx={{ display: 'flex', gap: '2px', alignItems: 'flex-end', height: 56, touchAction: 'pan-y' }}
+        onPointerMove={(e) => {
+          const r = e.currentTarget.getBoundingClientRect();
+          setHover(Math.max(0, Math.min(all.length - 1, Math.floor(((e.clientX - r.left) / r.width) * all.length))));
+        }}>
         {all.map((s, i) => {
           const h = s.class ? Math.min(12 + s.rateMmH * 3, 56) : 4;
           const isNowEdge = i === past.length;
@@ -97,6 +88,7 @@ export function RadarStrip({ nc, tz }: { nc: Nowcast; tz: string }) {
 }
 
 const W = 720;
+const DIVERGE = 4;
 
 /** Temperatura consolidada (linha) com faixa entre modelos (mín–máx). */
 export function TempChart({ hours, tz, now }: { hours: HourRow[]; tz: string; now: number }) {
@@ -122,6 +114,14 @@ export function TempChart({ hours, tz, now }: { hours: HourRow[]; tz: string; no
     [...pts].reverse().map((p) => `L${x(p.time).toFixed(1)},${y(p.temperature!.min).toFixed(1)}`).join('') +
     'Z';
   const ticks = [lo, Math.round((lo + hiV) / 2), hiV];
+  // trechos em que a diferença entre o modelo mais quente e o mais frio passa de DIVERGE °C
+  const divergent: [number, number][] = [];
+  pts.forEach((p) => {
+    if (p.temperature!.max - p.temperature!.min <= DIVERGE) return;
+    const last = divergent[divergent.length - 1];
+    if (last && p.time - last[1] <= 3600) last[1] = p.time;
+    else divergent.push([p.time, p.time]);
+  });
   const ink = theme.palette.text.secondary;
   const onMove = (e: PointerEvent<SVGSVGElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
@@ -135,16 +135,23 @@ export function TempChart({ hours, tz, now }: { hours: HourRow[]; tz: string; no
   const sel = hi !== null ? pts[hi] : null;
   return (
     <Box sx={{ position: 'relative' }}>
-      {sel && (
-        <Tooltip at={(x(sel.time) / W) * 100}>
-          <strong>{hm(sel.time, tz)}</strong>
-          <br />
-          Consenso: {num(sel.temperature!.value, 1)} °C
-          <br />
-          Modelos: {num(sel.temperature!.min, 1)}–{num(sel.temperature!.max, 1)} °C ({sel.temperature!.n})
-        </Tooltip>
-      )}
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label="Temperatura consolidada e faixa entre modelos" onPointerMove={onMove} onPointerLeave={() => setHi(null)} style={{ touchAction: 'pan-y' }}>
+      <Readout>
+        {sel && (
+          <>
+            <strong>{hm(sel.time, tz)}</strong> · consenso <strong>{num(sel.temperature!.value, 1)} °C</strong>
+            <br />
+            Entre os {sel.temperature!.n} modelos: {num(sel.temperature!.min, 1)} a {num(sel.temperature!.max, 1)} °C
+            {sel.temperature!.max - sel.temperature!.min > DIVERGE ? ' — modelos divergem neste horário' : ''}
+          </>
+        )}
+      </Readout>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label="Temperatura consolidada e faixa entre modelos" onPointerMove={onMove} onPointerDown={onMove} style={{ touchAction: 'pan-y' }}>
+        {divergent.map(([a, b]) => (
+          <g key={a}>
+            <rect x={x(a)} y={8} width={Math.max(x(b) - x(a), 2)} height={H - 30} fill={theme.palette.text.primary} opacity={0.06} />
+            <text x={(x(a) + x(b)) / 2} y={20} textAnchor="middle" fontSize="10" fill={ink}>modelos divergem</text>
+          </g>
+        ))}
         {ticks.map((t) => (
           <g key={t}>
             <line x1={36} x2={W - 12} y1={y(t)} y2={y(t)} stroke={theme.palette.divider} />
@@ -162,55 +169,71 @@ export function TempChart({ hours, tz, now }: { hours: HourRow[]; tz: string; no
         {sel && <circle cx={x(sel.time)} cy={y(sel.temperature!.value!)} r={5} fill={brand.yellow} stroke={theme.palette.background.paper} strokeWidth={2} />}
       </svg>
       <Typography variant="caption" color="text.secondary">
-        Linha: mediana ponderada · faixa: menor e maior valor entre os modelos · linha verde: agora
+        Linha: mediana ponderada · faixa: menor e maior valor entre os modelos · linha verde: agora · área sombreada: modelos discordam em mais de {DIVERGE} °C (ex.: horário de chegada de uma frente)
       </Typography>
     </Box>
   );
 }
 
 /** Chuva em blocos de 3 h: barra = mediana dos modelos (mm); número abaixo = probabilidade do ensemble. */
-export function RainBlocks({ blocks, tz, now }: { blocks: Block[]; tz: string; now: number }) {
-  const [sel, setSel] = useState<Block | null>(null);
+export function RainBlocks({ blocks, tz, now, nowcast }: { blocks: Block[]; tz: string; now: number; nowcast?: Nowcast }) {
   const data = blocks.filter((b) => b.end > now);
-  const maxV = Math.max(5, ...data.map((b) => b.precipMax ?? 0));
+  const [sel, setSel] = useState<Block | null>(data[0] ?? null);
+  // O que o radar mostra (observado agora + extrapolação até 2 h) dentro de cada bloco
+  const radarIn = (b: Block): string | null => {
+    if (!nowcast?.available) return null;
+    const steps = [nowcast.current, ...(nowcast.forecast ?? [])].filter((x): x is RadarStep => !!x && !!x.time);
+    const inside = steps.filter((x) => x.time! >= b.start && x.time! < b.end);
+    if (!inside.length) return null;
+    const order = ['fraca', 'moderada', 'forte', 'muito forte'];
+    const cls = inside.map((x) => x.class).filter((c): c is string => !!c);
+    return cls.length ? cls.reduce((x, y) => (order.indexOf(y) > order.indexOf(x) ? y : x)) : 'seco';
+  };
   return (
     <Box sx={{ position: 'relative' }}>
-      <Box sx={{ display: 'flex', gap: '2px', overflowX: 'auto', pb: 0.5 }} onPointerLeave={() => setSel(null)}>
+      <Readout>
+        {sel && (
+          <>
+            <strong>
+              {hm(sel.start, tz)}–{hm(sel.end, tz)}
+            </strong>{' '}
+            · chance de chuva <strong>{pct(sel.rainProbability)}</strong> (ensemble) · quantidade mais provável {num(sel.precipMedian, 1)} mm
+            {sel.precipMax ? ` (até ${num(sel.precipMax, 1)} mm no modelo mais chuvoso)` : ''}
+            {sel.heavyProbability ? ` · chuva forte ${pct(sel.heavyProbability)}` : ''}
+            {radarIn(sel) && radarIn(sel) !== 'seco' ? ` · RADAR: chuva ${radarIn(sel)}` : ''}
+          </>
+        )}
+      </Readout>
+      <Box sx={{ display: 'flex', gap: '2px', overflowX: 'auto', pb: 0.5 }}>
         {data.map((b) => {
-          const v = b.precipMedian ?? 0;
-          const h = Math.max((v / maxV) * 72, v > 0 ? 4 : 2);
-          const mx = ((b.precipMax ?? 0) / maxV) * 72;
+          const p = b.rainProbability ?? 0;
+          const h = Math.max(p * 72, 2);
           const active = sel?.start === b.start;
+          const rd = radarIn(b);
           return (
             <Box
               key={b.start}
-              onPointerEnter={() => setSel(b)}
               onClick={() => setSel(b)}
-              sx={{ flex: '1 0 34px', textAlign: 'center', cursor: 'pointer', outline: active ? `1px solid ${brand.green}` : 'none', borderRadius: '3px' }}
+              onPointerEnter={(e) => e.pointerType === 'mouse' && setSel(b)}
+              sx={{ flex: '1 0 38px', textAlign: 'center', cursor: 'pointer', outline: active ? `1px solid ${brand.green}` : 'none', borderRadius: '3px', py: 0.25 }}
             >
-              <Box sx={{ height: 76, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', position: 'relative' }}>
-                <Box sx={{ position: 'absolute', bottom: 0, width: 2, height: mx, bgcolor: 'text.disabled' }} />
-                <Box sx={{ width: 16, height: h, bgcolor: v > 0 ? brand.blue : 'action.disabledBackground', borderRadius: '4px 4px 0 0', position: 'relative' }} />
+              <Typography sx={{ fontSize: '0.74rem', fontFamily: condensed, fontWeight: 800 }}>{pct(b.rainProbability)}</Typography>
+              <Box sx={{ height: 74, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                <Box sx={{ width: 18, height: h, bgcolor: p > 0 ? brand.blue : 'action.disabledBackground', opacity: 0.35 + 0.65 * p, borderRadius: '4px 4px 0 0' }} />
               </Box>
-              <Typography sx={{ fontSize: '0.7rem', fontWeight: 600 }}>{num(b.precipMedian, b.precipMedian && b.precipMedian < 10 ? 1 : 0)}</Typography>
-              <Typography sx={{ fontSize: '0.7rem', fontFamily: condensed, fontWeight: 700 }}>{pct(b.rainProbability)}</Typography>
+              <Typography sx={{ fontSize: '0.68rem' }}>{b.precipMedian ? `${num(b.precipMedian, b.precipMedian < 10 ? 1 : 0)} mm` : '—'}</Typography>
               <Typography sx={{ fontSize: '0.64rem' }} color="text.secondary">{hour(b.start, tz)}</Typography>
+              <Box sx={{ height: 14, mt: 0.25 }}>
+                {rd && rd !== 'seco' && (
+                  <Box sx={{ mx: 'auto', width: 'fit-content', px: 0.5, fontSize: '0.56rem', fontFamily: condensed, fontWeight: 700, letterSpacing: '0.06em', border: `1px solid ${brand.green}`, borderRadius: '2px' }}>RADAR</Box>
+                )}
+              </Box>
             </Box>
           );
         })}
       </Box>
-      {sel && (
-        <Box sx={{ mt: 1, p: 1.25, bgcolor: 'action.hover', borderRadius: '4px', fontSize: '0.82rem' }}>
-          <strong>
-            {hm(sel.start, tz)}–{hm(sel.end, tz)}
-          </strong>{' '}
-          · mediana {num(sel.precipMedian, 1)} mm (máx. entre modelos {num(sel.precipMax, 1)} mm) · chance (ensemble) {pct(sel.rainProbability)}
-          {sel.heavyProbability ? ` · chuva forte ${pct(sel.heavyProbability)}` : ''}
-          {sel.modelAgreementWet !== null && ` · ${pct(sel.modelAgreementWet)} do peso dos modelos com chuva`}
-        </Box>
-      )}
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-        Linha 1: chuva (mm/3 h, mediana; traço = maior modelo) · Linha 2: probabilidade bruta do ensemble (≥0,5 mm/3 h) · Linha 3: início do bloco
+        Barra e % = chance de chover (≥0,5 mm em 3 h, ensembles). Abaixo: quantidade mais provável e início do bloco. "RADAR" = o radar mostra chuva nesse período.
       </Typography>
     </Box>
   );

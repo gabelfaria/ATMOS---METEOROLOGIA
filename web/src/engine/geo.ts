@@ -51,3 +51,9 @@ export const metersPerPx = (lat: number, z: number, tile = 256) => (Math.cos(rad
 export function roundCell(lat: number, lon: number, step = 0.1): [number, number] {
   return [Math.round(Math.round(lat / step) * step * 1e4) / 1e4, Math.round(Math.round(lon / step) * step * 1e4) / 1e4];
 }
+
+export function worldPxToLonLat(x: number, y: number, z: number, tile = 256): [number, number] {
+  const scale = tile * 2 ** z;
+  const n = Math.PI - (2 * Math.PI * y) / scale;
+  return [(x / scale) * 360 - 180, deg(Math.atan(Math.sinh(n)))];
+}

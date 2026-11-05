@@ -2,7 +2,7 @@
 // Só quadros PASSADOS; nada de quadros futuros inventados. Passo real de 10 min.
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Nowcast, RadarStep } from '../api/types';
-import { compass8, lonLatToWorldPx, metersPerPx } from './geo';
+import { compass8, lonLatToWorldPx, metersPerPx, worldPxToLonLat } from './geo';
 import { get, SourceError } from './net';
 import { RADAR_COLORS } from './radarColors';
 
@@ -254,7 +254,22 @@ function extrapolate(last: RadarImage, row: number, col: number, vy: number, vx:
 }
 const firstArrival = (s: { lead: number; dbz: number | null }[]) => s.find((x) => x.dbz !== null && x.dbz >= ECHO)?.lead ?? null;
 
+/** Último campo de radar decodificado + movimento (para o mapa extrapolar a imagem real). */
+export interface RadarField {
+  dbz: Float32Array;
+  size: number;
+  time: number;
+  /** cantos [oeste, sul, leste, norte] e função que desloca a imagem por (linhas, colunas) */
+  corners: (dRow: number, dCol: number) => [[number, number], [number, number], [number, number], [number, number]];
+  motion: { vy: number; vx: number } | null;
+  stepMinutes: number;
+}
+let lastMotionPx: { vy: number; vx: number } | null = null;
+const fields = new Map<string, RadarField>();
+export const radarField = (lat: number, lon: number) => fields.get(`${Math.round(lat * 4) / 4},${Math.round(lon * 4) / 4}`) ?? null;
+
 export function analyze(frames: RadarImage[], lat: number, lon: number, now = Date.now() / 1000): Nowcast {
+  lastMotionPx = null;
   const last = frames[frames.length - 1];
   const [row, col] = last.pixelOf(lat, lon);
   const km = last.kmPerPx;
@@ -306,6 +321,7 @@ export function analyze(frames: RadarImage[], lat: number, lon: number, now = Da
   };
   if (motion.valid) {
     const { vy, vx } = motion;
+    lastMotionPx = { vy, vx };
     const toward = ((Math.atan2(vx, -vy) * 180) / Math.PI + 360) % 360;
     res.motion = {
       speedKmh: Math.round(Math.hypot(vy, vx) * km * 6), towardDeg: Math.round(toward), toward: compass8(toward), from: compass8(toward + 180),
@@ -416,6 +432,18 @@ export async function nowcast(lat: number, lon: number): Promise<Nowcast & { sta
   const frames = settled.filter((s): s is PromiseFulfilledResult<RadarImage> => s.status === 'fulfilled').map((s) => s.value);
   if (frames.length < 2) return { available: false, coverage: cov, reason: 'Quadros de radar insuficientes' };
   const res = analyze(frames, lat, lon);
+  const last = frames[frames.length - 1];
+  const [cx, cy] = lonLatToWorldPx(clon, clat, 6, last.size);
+  const h = last.size / 2;
+  fields.set(`${clat},${clon}`, {
+    dbz: last.dbz, size: last.size, time: last.time, motion: lastMotionPx, stepMinutes: 10,
+    corners: (dr, dc) => [
+      worldPxToLonLat(cx - h + dc, cy - h + dr, 6, last.size),
+      worldPxToLonLat(cx + h + dc, cy - h + dr, 6, last.size),
+      worldPxToLonLat(cx + h + dc, cy + h + dr, 6, last.size),
+      worldPxToLonLat(cx - h + dc, cy + h + dr, 6, last.size),
+    ],
+  });
   res.coverage = cov;
   if (cov.areaFraction < 0.8) {
     res.confidence = 'low';
