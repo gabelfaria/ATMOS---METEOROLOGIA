@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/root"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical"
+    android:background="@drawable/widget_bg" android:padding="12dp">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <ImageView android:layout_width="4dp" android:layout_height="14dp" android:background="#00FF85" android:contentDescription="@null"/>
+        <TextView android:id="@+id/place" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:layout_marginStart="6dp" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold"
+            android:maxLines="1" android:ellipsize="end" android:text="ATMOS"/>
+        <TextView android:id="@+id/updated" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="#99FFFFFF" android:textSize="11sp" android:text=""/>
+        <ImageView android:id="@+id/refresh" android:layout_width="26dp" android:layout_height="26dp" android:padding="4dp"
+            android:layout_marginStart="2dp" android:src="@drawable/ic_w_refresh" android:contentDescription="Atualizar"/>
+    </LinearLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="2dp">
+        <ImageView android:id="@+id/icon" android:layout_width="46dp" android:layout_height="46dp" android:src="@drawable/ic_w_cloudy"/>
+        <TextView android:id="@+id/temp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="6dp"
+            android:textColor="#FFFFFF" android:textSize="44sp" android:textStyle="bold" android:fontFamily="sans-serif-condensed" android:includeFontPadding="false" android:text="--°"/>
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="8dp">
+            <TextView android:id="@+id/condition" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF"
+                android:textSize="13sp" android:textStyle="bold" android:maxLines="1" android:ellipsize="end" android:text=""/>
+            <TextView android:id="@+id/minmax" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#CCFFFFFF"
+                android:textSize="12sp" android:maxLines="1" android:text=""/>
+            <TextView android:id="@+id/kind" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00FF85"
+                android:textSize="10sp" android:textStyle="bold" android:letterSpacing="0.08" android:maxLines="1" android:text=""/>
+        </LinearLayout>
+    </LinearLayout>
+    <TextView android:id="@+id/verdict" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp"
+        android:textColor="#FFFFFF" android:textSize="13sp" android:maxLines="2" android:ellipsize="end" android:text="Abra o ATMOS para carregar a previsão."/>
+    <TextView android:id="@+id/alert" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp"
+        android:background="@drawable/widget_chip_alert" android:paddingStart="6dp" android:paddingEnd="6dp" android:paddingTop="1dp" android:paddingBottom="1dp"
+        android:textColor="#FFFFFF" android:textSize="11sp" android:textStyle="bold" android:maxLines="1" android:ellipsize="end" android:visibility="gone" android:text=""/>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="6dp">
+        <LinearLayout android:id="@+id/h1" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:orientation="vertical" android:gravity="center_horizontal" android:background="@drawable/widget_hour_bg"
+            android:paddingTop="4dp" android:paddingBottom="4dp" android:layout_marginStart="0dp">
+            <TextView android:id="@+id/h1_time" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="#CCFFFFFF" android:textSize="11sp" android:fontFamily="sans-serif-condensed" android:text="--"/>
+            <ImageView android:id="@+id/h1_icon" android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_w_cloudy"/>
+            <TextView android:id="@+id/h1_temp" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold" android:fontFamily="sans-serif-condensed" android:text="--"/>
+            <TextView android:id="@+id/h1_p" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="#7FB8FF" android:textSize="11sp" android:textStyle="bold" android:fontFamily="sans-serif-condensed" android:text="--"/>
+            <ProgressBar android:id="@+id/h1_bar" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent"
+                android:layout_height="3dp" android:layout_marginStart="8dp" android:layout_marginEnd="8dp" android:max="100" android:progress="0"
+                android:progressTint="#3488FF" android:progressBackgroundTint="#33FFFFFF"/>
+        </LinearLayout>
+        <LinearLayout android:id="@+id/h2" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:orientation="vertical" android:gravity="center_horizontal" android:background="@drawable/widget_hour_bg"
+            android:paddingTop="4dp" android:paddingBottom="4dp" android:layout_marginStart="4dp">
+            <TextView android:id="@+id/h2_time" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="#CCFFFFFF" android:textSize="11sp" android:fontFamily="sans-serif-condensed" android:text="--"/>
+            <ImageView android:id="@+id/h2_icon" android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_w_cloudy"/>
+            <TextView android:id="@+id/h2_temp" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold" android:fontFamily="sans-serif-condensed" android:text="--"/>
+            <TextView android:id="@+id/h2_p" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="#7FB8FF" android:textSize="11sp" android:textStyle="bold" android:fontFamily="sans-serif-condensed" android:text="--"/>
+            <ProgressBar android:id="@+id/h2_bar" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent"
+                android:layout_height="3dp" android:layout_marginStart="8dp" android:layout_marginEnd="8dp" android:max="100" android:progress="0"
+                android:progressTint="#3488FF" android:progressBackgroundTint="#33FFFFFF"/>
+        </LinearLayout>
+        <LinearLayout android:id="@+id/h3" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:orientation="vertical" android:gravity="center_horizontal" android:background="@drawable/widget_hour_bg"
+            android:paddingTop="4dp" android:paddingBottom="4dp" android:layout_marginStart="4dp">
+            <TextView android:id="@+id/h3_time" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="#CCFFFFFF" android:textSize="11sp" android:fontFamily="sans-serif-condensed" android:text="--"/>
+            <ImageView android:id="@+id/h3_icon" android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_w_cloudy"/>
+            <TextView android:id="@+id/h3_temp" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold" android:fontFamily="sans-serif-condensed" android:text="--"/>
+            <TextView android:id="@+id/h3_p" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="#7FB8FF" android:textSize="11sp" android:textStyle="bold" android:fontFamily="sans-serif-condensed" android:text="--"/>
+            <ProgressBar android:id="@+id/h3_bar" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent"
+                android:layout_height="3dp" android:layout_marginStart="8dp" android:layout_marginEnd="8dp" android:max="100" android:progress="0"
+                android:progressTint="#3488FF" android:progressBackgroundTint="#33FFFFFF"/>
+        </LinearLayout>
+        <LinearLayout android:id="@+id/h4" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:orientation="vertical" android:gravity="center_horizontal" android:background="@drawable/widget_hour_bg"
+            android:paddingTop="4dp" android:paddingBottom="4dp" android:layout_marginStart="4dp">
+            <TextView android:id="@+id/h4_time" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="#CCFFFFFF" android:textSize="11sp" android:fontFamily="sans-serif-condensed" android:text="--"/>
+            <ImageView android:id="@+id/h4_icon" android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_w_cloudy"/>
+            <TextView android:id="@+id/h4_temp" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold" android:fontFamily="sans-serif-condensed" android:text="--"/>
+            <TextView android:id="@+id/h4_p" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textColor="#7FB8FF" android:textSize="11sp" android:textStyle="bold" android:fontFamily="sans-serif-condensed" android:text="--"/>
+            <ProgressBar android:id="@+id/h4_bar" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent"
+                android:layout_height="3dp" android:layout_marginStart="8dp" android:layout_marginEnd="8dp" android:max="100" android:progress="0"
+                android:progressTint="#3488FF" android:progressBackgroundTint="#33FFFFFF"/>
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

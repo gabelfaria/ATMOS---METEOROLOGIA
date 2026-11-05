@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/root"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical"
+    android:background="@drawable/widget_bg" android:padding="12dp">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <ImageView android:layout_width="4dp" android:layout_height="14dp" android:background="#00FF85" android:contentDescription="@null"/>
+        <TextView android:id="@+id/place" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:layout_marginStart="6dp" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold"
+            android:maxLines="1" android:ellipsize="end" android:text="ATMOS"/>
+        <TextView android:id="@+id/updated" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="#99FFFFFF" android:textSize="11sp" android:text=""/>
+        <ImageView android:id="@+id/refresh" android:layout_width="26dp" android:layout_height="26dp" android:padding="4dp"
+            android:layout_marginStart="2dp" android:src="@drawable/ic_w_refresh" android:contentDescription="Atualizar"/>
+    </LinearLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="2dp">
+        <ImageView android:id="@+id/icon" android:layout_width="38dp" android:layout_height="38dp" android:src="@drawable/ic_w_cloudy"/>
+        <TextView android:id="@+id/temp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="6dp"
+            android:textColor="#FFFFFF" android:textSize="36sp" android:textStyle="bold" android:fontFamily="sans-serif-condensed" android:includeFontPadding="false" android:text="--°"/>
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:layout_marginStart="8dp">
+            <TextView android:id="@+id/condition" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFF"
+                android:textSize="13sp" android:textStyle="bold" android:maxLines="1" android:ellipsize="end" android:text=""/>
+            <TextView android:id="@+id/minmax" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#CCFFFFFF"
+                android:textSize="12sp" android:maxLines="1" android:text=""/>
+            <TextView android:id="@+id/kind" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#00FF85"
+                android:textSize="10sp" android:textStyle="bold" android:letterSpacing="0.08" android:maxLines="1" android:text=""/>
+        </LinearLayout>
+    </LinearLayout>
+    <TextView android:id="@+id/verdict" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp"
+        android:textColor="#FFFFFF" android:textSize="13sp" android:maxLines="3" android:ellipsize="end" android:text="Abra o ATMOS para carregar a previsão."/>
+    <TextView android:id="@+id/alert" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp"
+        android:background="@drawable/widget_chip_alert" android:paddingStart="6dp" android:paddingEnd="6dp" android:paddingTop="1dp" android:paddingBottom="1dp"
+        android:textColor="#FFFFFF" android:textSize="11sp" android:textStyle="bold" android:maxLines="1" android:ellipsize="end" android:visibility="gone" android:text=""/>
+</LinearLayout>

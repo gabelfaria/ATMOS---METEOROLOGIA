@@ -1,7 +1,9 @@
 import { Box, Link, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from '@mui/material';
 import { useCatalog } from '../api/client';
 import type { Forecast } from '../api/types';
+import { KV, ModelDetail } from '../components/details';
 import { Empty, Panel, SourceLine } from '../components/ui';
+import { useApp } from '../lib/appctx';
 import { ago, dateTime, num, pct } from '../lib/format';
 import { brand, condensed } from '../theme';
 
@@ -36,6 +38,7 @@ export function AnalysisPage({ data }: { data: Forecast }) {
   const rows = data.mediumTerm.models;
   const audit = data.audit;
   const catalog = useCatalog();
+  const { openSheet } = useApp();
   return (
     <Stack spacing={2}>
       <Panel title="Consenso de modelos · próximas 48 h" dense>
@@ -51,7 +54,7 @@ export function AnalysisPage({ data }: { data: Forecast }) {
             </TableHead>
             <TableBody>
               {rows.map((r) => (
-                <TableRow key={r.model}>
+                <TableRow key={r.model} hover onClick={() => openSheet(r.name, <ModelDetail data={data} r={r} />, brand.yellow)} sx={{ cursor: 'pointer' }}>
                   <TableCell>
                     <Typography sx={{ fontWeight: 700, fontSize: '0.9rem' }}>{r.name}</Typography>
                     <Typography variant="caption" color="text.secondary">
@@ -88,7 +91,7 @@ export function AnalysisPage({ data }: { data: Forecast }) {
         </TableContainer>
         <Box sx={{ p: 1.5 }}>
           <Typography variant="caption" color="text.secondary">
-            CONCORDA: temperatura até 1 °C do consenso e chuva total compatível. PARCIAL: só um dos critérios. Peso = resolução × dependência entre
+            Toque num modelo para ver o cálculo do peso e o desempenho medido. CONCORDA: temperatura até 1 °C do consenso e chuva total compatível. PARCIAL: só um dos critérios. Peso = resolução × dependência entre
             modelos × desempenho local medido (quando há amostra ≥48 h). Concordância não é probabilidade.
           </Typography>
         </Box>
@@ -182,7 +185,27 @@ export function AnalysisPage({ data }: { data: Forecast }) {
         <Table size="small">
           <TableBody>
             {data.sources.map((s) => (
-              <TableRow key={s.id}>
+              <TableRow
+                key={s.id}
+                hover
+                sx={{ cursor: 'pointer' }}
+                onClick={() =>
+                  openSheet(
+                    s.name,
+                    <KV
+                      rows={[
+                        ['Situação', STATUS[s.status]?.label ?? s.status],
+                        ['Tipo', s.kind],
+                        ['Mensagem', s.message ?? '—'],
+                        ['Horário do dado', s.dataTime ? `${dateTime(s.dataTime, tz)} (${ago(s.dataTime)})` : '—'],
+                        ['Obtido', s.fetchedAt ? ago(s.fetchedAt) : '—'],
+                        ['Resolução', s.resolutionKm ? `~${s.resolutionKm} km` : '—'],
+                      ]}
+                    />,
+                    STATUS[s.status]?.color,
+                  )
+                }
+              >
                 <TableCell>
                   <Typography sx={{ fontSize: '0.88rem', fontWeight: 600 }}>{s.name}</Typography>
                   {s.message && (

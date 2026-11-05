@@ -17,6 +17,10 @@ docs/      FONTES.md (fontes, acesso, riscos) · ARQUITETURA.md (motor, regras, 
 O APK roda o motor meteorológico **no próprio celular**, consultando as fontes diretamente — não precisa de
 servidor. Para instalar: copie o `.apk` para o celular, toque nele e permita "instalar apps desta fonte".
 
+**Widget da tela inicial** (Android): segure na tela inicial → Widgets → ATMOS. Mostra temperatura (medida ou de
+modelo, identificada), condição pelo radar, uma frase sobre a chuva, máx/mín, as próximas horas com chance de chuva
+e o alerta oficial do INMET em vigor. É atualizado pelo app e, em segundo plano, a cada ~30 min (dados de modelo).
+
 Para gerar um novo APK (Android SDK + Java 21):
 
 ```bash

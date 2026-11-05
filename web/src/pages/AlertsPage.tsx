@@ -4,6 +4,7 @@ import { deleteServerData } from '../api/client';
 import type { Forecast } from '../api/types';
 import { Empty, KindBadge, Panel } from '../components/ui';
 import { useLocation } from '../lib/location';
+import { useApp } from '../lib/appctx';
 import { disableNotifications, enableNotifications, notificationsEnabled, notificationsSupported } from '../lib/notify';
 import { clearAll } from '../lib/storage';
 import { dateTime, hm } from '../lib/format';
@@ -17,6 +18,7 @@ export function AlertsPage({ data }: { data: Forecast }) {
   const [notif, setNotif] = useState(notificationsEnabled());
   const [msg, setMsg] = useState<string | null>(null);
   const { official, estimated } = data.alerts;
+  const { go } = useApp();
 
   const toggle = async () => {
     if (notif) {
@@ -72,9 +74,14 @@ export function AlertsPage({ data }: { data: Forecast }) {
                       {a.instructions.join(' ')}
                     </Typography>
                   )}
-                  <Link href={a.url} target="_blank" rel="noopener" variant="body2" sx={{ display: 'inline-block', mt: 1 }}>
-                    Ver no portal do INMET
-                  </Link>
+                  <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
+                    <Link href={a.url} target="_blank" rel="noopener" variant="body2">
+                      Ver no portal do INMET
+                    </Link>
+                    <Link component="button" variant="body2" onClick={() => go('map', { mapLayer: 'radar' })}>
+                      Ver área no mapa
+                    </Link>
+                  </Stack>
                 </Box>
               </Box>
             ))}
@@ -103,6 +110,21 @@ export function AlertsPage({ data }: { data: Forecast }) {
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
                     Base: {a.reasons.filter(Boolean).join(' · ')}
                   </Typography>
+                  <Button
+                    size="small"
+                    sx={{ mt: 0.5, px: 0 }}
+                    onClick={() =>
+                      a.type === 'rain_imminent' || a.type === 'heavy_rain_now'
+                        ? go('map', { mapLayer: 'radar' })
+                        : a.type === 'strong_gusts'
+                          ? go('map', { mapLayer: 'gust' })
+                          : a.type === 'thunder_observed'
+                            ? go('now')
+                            : go('forecast', { forecastTab: 1 })
+                    }
+                  >
+                    {a.type === 'rain_imminent' || a.type === 'heavy_rain_now' ? 'Ver radar ›' : a.type === 'strong_gusts' ? 'Ver rajadas no mapa ›' : a.type === 'thunder_observed' ? 'Ver estação ›' : 'Ver previsão ›'}
+                  </Button>
                 </Box>
               </Box>
             ))}

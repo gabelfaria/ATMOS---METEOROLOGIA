@@ -1,7 +1,10 @@
 import { Box, Stack, Typography, useTheme } from '@mui/material';
 import { useMemo, useState, type PointerEvent } from 'react';
 import type { Block, Day, HourRow, Nowcast, RadarStep } from '../api/types';
+import { useApp } from '../lib/appctx';
 import { dayMonth, hm, hour, num, pct, weekday } from '../lib/format';
+import { BlockDetail, DayDetail } from './details';
+import type { Forecast } from '../api/types';
 import { brand, condensed, confColor } from '../theme';
 
 const CLASS_COLOR: Record<string, string> = {
@@ -176,7 +179,8 @@ export function TempChart({ hours, tz, now }: { hours: HourRow[]; tz: string; no
 }
 
 /** Chuva em blocos de 3 h: barra = mediana dos modelos (mm); número abaixo = probabilidade do ensemble. */
-export function RainBlocks({ blocks, tz, now, nowcast }: { blocks: Block[]; tz: string; now: number; nowcast?: Nowcast }) {
+export function RainBlocks({ blocks, tz, now, nowcast, forecast }: { blocks: Block[]; tz: string; now: number; nowcast?: Nowcast; forecast?: Forecast }) {
+  const { openSheet } = useApp();
   const data = blocks.filter((b) => b.end > now);
   const [sel, setSel] = useState<Block | null>(data[0] ?? null);
   // O que o radar mostra (observado agora + extrapolação até 2 h) dentro de cada bloco
@@ -201,6 +205,15 @@ export function RainBlocks({ blocks, tz, now, nowcast }: { blocks: Block[]; tz: 
             {sel.precipMax ? ` (até ${num(sel.precipMax, 1)} mm no modelo mais chuvoso)` : ''}
             {sel.heavyProbability ? ` · chuva forte ${pct(sel.heavyProbability)}` : ''}
             {radarIn(sel) && radarIn(sel) !== 'seco' ? ` · RADAR: chuva ${radarIn(sel)}` : ''}
+            {forecast && (
+              <Box
+                component="button"
+                onClick={() => openSheet(`Chuva ${hm(sel.start, tz)}–${hm(sel.end, tz)}`, <BlockDetail data={forecast} b={sel} />, brand.blue)}
+                sx={{ all: 'unset', cursor: 'pointer', display: 'block', mt: 0.5, color: 'primary.main', fontWeight: 700, fontSize: '0.78rem' }}
+              >
+                Ver cada modelo e ensemble ›
+              </Box>
+            )}
           </>
         )}
       </Readout>
@@ -241,13 +254,20 @@ export function RainBlocks({ blocks, tz, now, nowcast }: { blocks: Block[]; tz: 
 
 /** Longo prazo: faixa P10–P90 da mínima à máxima por dia. */
 export function DayRows({ days, tz }: { days: Day[]; tz: string }) {
+  const { openSheet } = useApp();
   const lo = Math.min(...days.map((d) => d.tmin.p10 ?? 99));
   const hi = Math.max(...days.map((d) => d.tmax.p90 ?? -99));
   const sx = (v: number) => `${((v - lo) / (hi - lo || 1)) * 100}%`;
   return (
     <Box>
       {days.map((d) => (
-        <Box key={d.date} sx={{ display: 'grid', gridTemplateColumns: '52px 1fr 62px 30px', alignItems: 'center', gap: 1, py: 0.9, borderBottom: 1, borderColor: 'divider' }}>
+        <Box
+          key={d.date}
+          role="button"
+          tabIndex={0}
+          onClick={() => openSheet('Previsão do dia', <DayDetail d={d} tz={tz} />, confColor[d.confidence])}
+          sx={{ display: 'grid', gridTemplateColumns: '52px 1fr 62px 30px', alignItems: 'center', gap: 1, py: 0.9, borderBottom: 1, borderColor: 'divider', cursor: 'pointer', '&:active': { bgcolor: 'action.hover' } }}
+        >
           <Box>
             <Typography sx={{ fontFamily: condensed, fontWeight: 800, fontSize: 16, lineHeight: 1 }}>{weekday(d.date + 43200, tz)}</Typography>
             <Typography variant="caption" color="text.secondary">{dayMonth(d.date + 43200, tz)}</Typography>
@@ -272,7 +292,7 @@ export function DayRows({ days, tz }: { days: Day[]; tz: string }) {
         </Box>
       ))}
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-        Barra amarela: mediana da mínima à máxima · trilho cinza: P10 da mínima a P90 da máxima · % = chance de ≥1 mm no dia · mm = mediana–P90 · faixa à direita: confiança (verde alta, amarelo moderada, vermelho baixa)
+        Toque num dia para ver os detalhes de cada ensemble. Barra amarela: mediana da mínima à máxima · trilho cinza: P10 da mínima a P90 da máxima · % = chance de ≥1 mm no dia · mm = mediana–P90 · faixa à direita: confiança (verde alta, amarelo moderada, vermelho baixa)
       </Typography>
     </Box>
   );

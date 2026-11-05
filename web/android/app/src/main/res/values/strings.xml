@@ -4,4 +4,5 @@
     <string name="title_activity_main">ATMOS</string>
     <string name="package_name">br.atmos.meteorologia</string>
     <string name="custom_url_scheme">br.atmos.meteorologia</string>
+    <string name="widget_description">Tempo agora, próximas horas e alertas oficiais</string>
 </resources>

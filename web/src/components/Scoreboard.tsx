@@ -1,11 +1,11 @@
-import { Box, Stack, Typography } from '@mui/material';
+import { Box, ButtonBase, Stack, Typography } from '@mui/material';
 import type { Tile, Verdict } from '../api/types';
 import { ago, hm, KIND_LABEL } from '../lib/format';
 import { brand, condensed, confColor, kindColor } from '../theme';
 import { ConfidenceMeter } from './ui';
 
 /** Placar AGORA | PRÓXIMA HORA | PRÓXIMAS 24H. */
-export function Scoreboard({ tiles, tz, live }: { tiles: Tile[]; tz: string; live: boolean }) {
+export function Scoreboard({ tiles, tz, live, onTile }: { tiles: Tile[]; tz: string; live: boolean; onTile?: (id: Tile['id']) => void }) {
   return (
     <Box
       sx={{
@@ -34,14 +34,14 @@ export function Scoreboard({ tiles, tz, live }: { tiles: Tile[]; tz: string; liv
       </Stack>
       <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(tiles.length, 1)}, 1fr)` }}>
         {tiles.map((t, i) => (
-          <ScoreTile key={t.id} tile={t} tz={tz} first={i === 0} />
+          <ScoreTile key={t.id} tile={t} tz={tz} first={i === 0} onClick={onTile ? () => onTile(t.id) : undefined} />
         ))}
       </Box>
     </Box>
   );
 }
 
-function ScoreTile({ tile, tz, first }: { tile: Tile; tz: string; first: boolean }) {
+function ScoreTile({ tile, tz, first, onClick }: { tile: Tile; tz: string; first: boolean; onClick?: () => void }) {
   const accent = kindColor[tile.kind] ?? brand.green;
   const big =
     tile.value === null || tile.value === undefined ? (
@@ -64,7 +64,12 @@ function ScoreTile({ tile, tz, first }: { tile: Tile; tz: string; first: boolean
       </Box>
     );
   return (
-    <Box sx={{ position: 'relative', px: { xs: 1.25, sm: 2 }, pt: 0, pb: 1.5, minWidth: 0, borderLeft: first ? 0 : '2px solid rgba(255,255,255,0.12)' }}>
+    <ButtonBase
+      onClick={onClick}
+      disabled={!onClick}
+      aria-label={`${tile.label}: ver detalhes`}
+      sx={{ display: 'block', textAlign: 'left', color: 'inherit', position: 'relative', px: { xs: 1.25, sm: 2 }, pt: 0, pb: 1.5, minWidth: 0, borderLeft: first ? 0 : '2px solid rgba(255,255,255,0.12)', '&:active': { bgcolor: 'rgba(255,255,255,0.06)' } }}
+    >
       <Box sx={{ height: 4, bgcolor: accent, mx: { xs: -1.25, sm: -2 }, mb: 1 }} />
       <Typography sx={{ fontFamily: condensed, fontWeight: 800, letterSpacing: '0.12em', fontSize: { xs: '0.72rem', sm: '0.85rem' }, opacity: 0.9 }}>
         {tile.label}
@@ -80,13 +85,18 @@ function ScoreTile({ tile, tz, first }: { tile: Tile; tz: string; first: boolean
         {tile.source ?? ''}
         {tile.time ? ` · ${hm(tile.time, tz)}` : ''}
       </Typography>
-    </Box>
+      {onClick && (
+        <Box component="span" aria-hidden sx={{ position: 'absolute', right: 8, top: 10, fontSize: 14, opacity: 0.6 }}>
+          ›
+        </Box>
+      )}
+    </ButtonBase>
   );
 }
 
-export function VerdictCard({ verdict, tz }: { verdict: Verdict; tz: string }) {
+export function VerdictCard({ verdict, tz, onOpen }: { verdict: Verdict; tz: string; onOpen?: () => void }) {
   return (
-    <Box sx={{ bgcolor: 'background.paper', border: 1, borderColor: 'divider', borderRadius: '6px', overflow: 'hidden' }}>
+    <ButtonBase onClick={onOpen} disabled={!onOpen} aria-label="Por que este veredito" sx={{ display: 'block', width: '100%', textAlign: 'left', bgcolor: 'background.paper', border: 1, borderColor: 'divider', borderRadius: '6px', overflow: 'hidden' }}>
       <Box sx={{ display: 'flex' }}>
         <Box sx={{ width: 6, bgcolor: confColor[verdict.confidence] }} />
         <Box sx={{ p: 2, flex: 1, minWidth: 0 }}>
@@ -114,9 +124,14 @@ export function VerdictCard({ verdict, tz }: { verdict: Verdict; tz: string }) {
               <strong>Motivo:</strong> {verdict.confidenceReason}.
             </Typography>
           )}
+          {onOpen && (
+            <Typography sx={{ mt: 1, fontFamily: condensed, fontWeight: 700, letterSpacing: '0.08em', fontSize: '0.8rem', color: 'primary.main' }}>
+              TOQUE PARA VER AS FONTES E O RADAR ›
+            </Typography>
+          )}
         </Box>
       </Box>
-    </Box>
+    </ButtonBase>
   );
 }
 

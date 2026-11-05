@@ -1,5 +1,7 @@
 import { Box, Chip, Stack, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, Typography } from '@mui/material';
 import { useState } from 'react';
+import { BlockDetail, HourDetail, Tap } from '../components/details';
+import { useApp } from '../lib/appctx';
 import type { Forecast } from '../api/types';
 import { DayRows, RadarStrip, RainBlocks, TempChart } from '../components/charts';
 import { ConfidenceMeter, Empty, KindBadge, Panel, SourceLine, Stat } from '../components/ui';
@@ -123,6 +125,8 @@ function Short({ data }: { data: Forecast }) {
 }
 
 function Medium({ data }: { data: Forecast }) {
+  const { openSheet } = useApp();
+  const [confSel, setConfSel] = useState<number | null>(null);
   const tz = data.location.timezone;
   const now = Date.now() / 1000;
   const mt = data.mediumTerm;
@@ -157,7 +161,15 @@ function Medium({ data }: { data: Forecast }) {
         <Panel title="Horários de maior risco" accent={brand.red}>
           <Stack spacing={1}>
             {mt.riskWindows.slice(0, 6).map((r) => (
-              <Box key={r.start} sx={{ display: 'flex', gap: 1.5, alignItems: 'baseline' }}>
+              <Tap
+                key={r.start}
+                label="Detalhes do período"
+                onClick={() => {
+                  const b = mt.blocks.find((x) => x.start === r.start);
+                  if (b) openSheet(`${hm(b.start, tz)}–${hm(b.end, tz)} · ${r.kind}`, <BlockDetail data={data} b={b} />, brand.red);
+                }}
+              >
+              <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'baseline', py: 0.5, pr: 3 }}>
                 <Typography sx={{ fontWeight: 700, minWidth: 96 }}>
                   {hm(r.start, tz)}–{hm(r.end, tz)}
                 </Typography>
@@ -168,6 +180,7 @@ function Medium({ data }: { data: Forecast }) {
                   </Typography>
                 </Box>
               </Box>
+              </Tap>
             ))}
           </Stack>
         </Panel>
@@ -176,20 +189,31 @@ function Medium({ data }: { data: Forecast }) {
         <TempChart hours={mt.hours} tz={tz} now={now} />
       </Panel>
       <Panel title="Chuva · blocos de 3 h" accent={brand.blue} right={<KindBadge kind="ensemble" />}>
-        <RainBlocks blocks={mt.blocks} tz={tz} now={now} nowcast={data.shortTerm} />
+        <RainBlocks blocks={mt.blocks} tz={tz} now={now} nowcast={data.shortTerm} forecast={data} />
       </Panel>
       <Panel title="Confiança por período" accent={brand.green}>
         <Box sx={{ display: 'flex', gap: '2px' }}>
-          {mt.confidence.slice(0, 16).map((c) => (
-            <Box key={c.start} title={`${hm(c.start, tz)}–${hm(c.end, tz)}: ${c.reasons.join('; ')}`} sx={{ flex: 1, textAlign: 'center' }}>
-              <Box sx={{ height: 10, bgcolor: confColor[c.confidence], borderRadius: '2px' }} />
+          {mt.confidence.slice(0, 16).map((c, i) => (
+            <Box key={c.start} component="button" onClick={() => setConfSel(i)} aria-label={`Confiança ${hm(c.start, tz)}`} sx={{ all: 'unset', cursor: 'pointer', flex: 1, textAlign: 'center' }}>
+              <Box sx={{ height: confSel === i ? 16 : 10, bgcolor: confColor[c.confidence], borderRadius: '2px', transition: 'height .15s' }} />
               <Typography sx={{ fontSize: '0.62rem' }} color="text.secondary">
                 {hour(c.start, tz)}
               </Typography>
             </Box>
           ))}
         </Box>
-        <SourceLine>Verde alta · amarelo moderada · vermelho baixa. Considera prazo, dispersão entre modelos e divergência entre ensembles.</SourceLine>
+        {confSel !== null && mt.confidence[confSel] && (
+          <Box sx={{ mt: 1, p: 1.25, bgcolor: 'action.hover', borderRadius: '4px' }}>
+            <Typography variant="body2" sx={{ fontWeight: 700 }}>
+              {hm(mt.confidence[confSel].start, tz)}–{hm(mt.confidence[confSel].end, tz)} · confiança{' '}
+              {{ high: 'alta', moderate: 'moderada', low: 'baixa' }[mt.confidence[confSel].confidence]}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {mt.confidence[confSel].reasons.join(' · ')}
+            </Typography>
+          </Box>
+        )}
+        <SourceLine>Toque num período para ver o motivo. Verde alta · amarelo moderada · vermelho baixa.</SourceLine>
       </Panel>
       {hours.length > 0 && <Panel title="Previsão horária" dense>
         <TableContainer sx={{ maxHeight: 460 }}>
@@ -207,7 +231,7 @@ function Medium({ data }: { data: Forecast }) {
               {hours.map((h) => {
                 const b = blockOf(h.time);
                 return (
-                  <TableRow key={h.time}>
+                  <TableRow key={h.time} hover onClick={() => openSheet(`Previsão para ${hm(h.time, tz)}`, <HourDetail data={data} h={h} />, brand.yellow)} sx={{ cursor: 'pointer' }}>
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{hm(h.time, tz)}</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>{num(h.temperature?.value, 0)}°</TableCell>
                     <TableCell sx={{ color: 'text.secondary', whiteSpace: 'nowrap' }}>

@@ -8,6 +8,8 @@ import { ErrorState, Loading } from './components/ui';
 import { ago } from './lib/format';
 import { useLocation } from './lib/location';
 import { notifyAlerts } from './lib/notify';
+import { AppProvider } from './lib/appctx';
+import { pushWidget } from './lib/widget';
 import { load, save } from './lib/storage';
 import { AlertsPage } from './pages/AlertsPage';
 import { AnalysisPage } from './pages/AnalysisPage';
@@ -67,7 +69,8 @@ export default function App() {
 
   useEffect(() => {
     if (fc.data) notifyAlerts([...fc.data.alerts.official, ...fc.data.alerts.estimated]).catch(() => undefined);
-  }, [fc.data]);
+    if (fc.data && place) pushWidget(fc.data, place);
+  }, [fc.data, place]);
 
   const alertBadge = !!fc.data && (fc.data.alerts.official.some((a) => a.inForce) || fc.data.alerts.estimated.some((a) => a.severity !== 'info'));
   const live = !!fc.data && !fc.isError && Date.now() / 1000 - fc.data.generatedAt < 20 * 60;
@@ -114,6 +117,7 @@ export default function App() {
   );
 
   return (
+    <AppProvider setTab={setTab}>
     <Box sx={{ minHeight: '100dvh', bgcolor: 'background.default', pb: wide ? 2 : 'calc(64px + env(safe-area-inset-bottom))' }}>
       <AppBar position="sticky" elevation={0} sx={{ bgcolor: brand.purple, color: '#fff', borderBottom: `3px solid ${brand.green}`, pt: 'env(safe-area-inset-top)' }}>
         <Toolbar sx={{ gap: 1.5, minHeight: { xs: 56 } }}>
@@ -168,6 +172,7 @@ export default function App() {
       )}
       <LocationSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
     </Box>
+    </AppProvider>
   );
 }
 
